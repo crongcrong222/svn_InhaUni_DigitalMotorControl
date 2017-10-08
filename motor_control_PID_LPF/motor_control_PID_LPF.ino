@@ -6,7 +6,7 @@
 int cnt = 0;
 int data_in;        // port 값을 읽어들여 저장할 변수
 char str[64];       // message를 담기 위한 string data
-signed int data[2];
+float data[2];
 
 void configure_adc();
 
@@ -59,7 +59,12 @@ pmc_enable_periph_clk(ID_PIOD);
 pmc_enable_periph_clk(ID_PIOC);
 pmc_enable_periph_clk(ID_PIOB);
 pmc_enable_periph_clk(ID_PIOA);
-
+/*
+ * PIOD : 모터 역방향 제어에서 DIR를 제어
+ * PIOC : PWM 제어
+ * PIOB : 가변저항 PIO
+ * PIOA : 엔코더
+ */
   
 PIOD->PIO_PER = 0x000000F0;
 PIOD->PIO_IDR = 0x000000F0;
@@ -67,12 +72,12 @@ PIOD->PIO_OER = 0x000000F0;
 PIOD->PIO_OWER = 0x000000F0;
 PIOD->PIO_ODSR = 0x00000000;
 
-  PIOB->PIO_PER = 0x00000011;     //pin 25 (PD0)의 PIO를 enable
+  PIOB->PIO_PER = 0x00000011;     //가변저항과 연결된 핀 enable
   PIOB->PIO_IDR = 0x00000011;     //interrupt disable
   PIOB->PIO_IFER = 0x00000001;    //input filter enable register
   PIOB->PIO_ODR = 0x00000001;     //PD0을 입력으로 설정
 
-  PIOB->PIO_PER = 0x00000010;     //pin14 를 출력으로 설정
+  PIOB->PIO_PER = 0x00000010;     // 출력으로 설정
   PIOB->PIO_OWER = 0x00000010;    //Output Write Enable 설정해서
                                   //PIO_ODSR에 data를 쓸 수 있도록 함  
   PIOB->PIO_ODSR = 0x00000000;
@@ -250,7 +255,7 @@ LPF::~LPF()
 
 PID::PID(int32_t Ts)
 {
-  Kp = 1.2;
+  Kp = 1;
   Ki = 0.3;
   Kd = 1.9;
   Ts = Ts;
@@ -259,7 +264,7 @@ void PID::calc()
 {
   error = Wd - Wc;
   P_control = Kp * error;
-  //I_control = Ki * error * Ts;
+  I_control = Ki * error * Ts;
   D_control = Kd * (error - error_previous) / Ts;
   PID_control = P_control + D_control;
   error_previous = error;
