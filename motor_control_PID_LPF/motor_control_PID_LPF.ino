@@ -2,25 +2,19 @@
 //DIR1 핀은 due 14번핀
 //pin A7 (PA2)  가변저항1
 //pin A6 (PA3)  가변저항2
-
-int cnt = 0;
-int data_in;        // port 값을 읽어들여 저장할 변수
-char str[64];       // message를 담기 위한 string data
-float data[2];
-
+//pin 4 A상 엔코더
+//pin 5 B상 엔코더
 void configure_adc();
-
-float sim_time = 0;
-
-
-
 void configure_encoder_counter();
-//char str[64];
-int32_t cnt1, cnt2, start_count,result, re_count,duty;
-float sample_time;
+
+float data[2];          // 가변저항으로 부터 받은 값을 저장하기 위한 변수
+float sim_time = 0;     // duty sin으로 받을 때 simulation time 설정
+int32_t cnt1, cnt2, start_count,result, re_count;
+float sample_time, duty, error_previous;
 uint32_t MicrosSampleTime;
 uint32_t start_time, end_time;
-int32_t error_previous = 0;
+
+
 
 class LPF
 {
@@ -33,7 +27,6 @@ class LPF
   float xk, yk, uk;
 };
 
-
 class PID
 {
   public:
@@ -43,10 +36,9 @@ class PID
   public:
       int32_t Kp, Ki, Kd;
       int32_t Wc, Wd;
-      float P_control, I_control, D_control, PID_control;
-      int32_t error, Ts;
+      float P_control, I_control, D_control, PID_control,error;
+      int32_t Ts;
 };
-
 
 
 LPF LPF1(3.0, 0.02);
