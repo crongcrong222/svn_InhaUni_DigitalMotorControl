@@ -259,9 +259,9 @@ void PID::calc()
 {
   error = Wd - Wc;
   P_control = Kp * error;
-  I_control = Ki * error * Ts;
+  //I_control = Ki * error * Ts;
   D_control = Kd * (error - error_previous) / Ts;
-  PID_control = P_control + I_control + D_control;
+  PID_control = P_control + D_control;
   error_previous = error;
 }
 PID::~PID()
