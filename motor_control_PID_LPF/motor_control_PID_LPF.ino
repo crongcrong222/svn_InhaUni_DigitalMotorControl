@@ -43,7 +43,7 @@ class PID
   public:
       int32_t Kp, Ki, Kd;
       int32_t Wc, Wd;
-      int32_t P_control, I_control, D_control, PID_control;
+      float P_control, I_control, D_control, PID_control;
       int32_t error, Ts;
 };
 
@@ -169,10 +169,10 @@ void loop() {
   {
     PIOD->PIO_SODR = 0x00000010;
   }
-  PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(PID1.PID_control*2);
-  PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(PID1.PID_control*2);
-  PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(PID1.PID_control*2);
-  Serial.print(PID1.PID_control*2);
+  PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(PID1.PID_control);
+  PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(PID1.PID_control);
+  PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(PID1.PID_control);
+  Serial.print(PID1.PID_control);
   PWM->PWM_SCUC = 1;
   delay(1);
 
@@ -251,7 +251,7 @@ LPF::~LPF()
 PID::PID(int32_t Ts)
 {
   Kp = 1.2;
-  Ki = 0.5;
+  Ki = 0.3;
   Kd = 1.9;
   Ts = Ts;
 }
