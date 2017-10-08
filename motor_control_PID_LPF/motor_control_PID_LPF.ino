@@ -2,19 +2,25 @@
 //DIR1 핀은 due 14번핀
 //pin A7 (PA2)  가변저항1
 //pin A6 (PA3)  가변저항2
-//pin 4 A상 엔코더
-//pin 5 B상 엔코더
-void configure_adc();
-void configure_encoder_counter();
 
-float data[2];          // 가변저항으로 부터 받은 값을 저장하기 위한 변수
-float sim_time = 0;     // duty sin으로 받을 때 simulation time 설정
-int32_t cnt1, cnt2, start_count,result, re_count;
-float sample_time, duty, error_previous;
+int cnt = 0;
+int data_in;        // port 값을 읽어들여 저장할 변수
+char str[64];       // message를 담기 위한 string data
+signed int data[2];
+
+void configure_adc();
+
+float sim_time = 0;
+
+
+
+void configure_encoder_counter();
+//char str[64];
+int32_t cnt1, cnt2, start_count,result, re_count,duty;
+float sample_time;
 uint32_t MicrosSampleTime;
 uint32_t start_time, end_time;
-
-
+int32_t error_previous = 0;
 
 class LPF
 {
@@ -27,6 +33,7 @@ class LPF
   float xk, yk, uk;
 };
 
+
 class PID
 {
   public:
@@ -36,9 +43,10 @@ class PID
   public:
       int32_t Kp, Ki, Kd;
       int32_t Wc, Wd;
-      float P_control, I_control, D_control, PID_control,error;
-      int32_t Ts;
+      int32_t P_control, I_control, D_control, PID_control;
+      int32_t error, Ts;
 };
+
 
 
 LPF LPF1(3.0, 0.02);
@@ -57,19 +65,20 @@ pmc_enable_periph_clk(ID_PIOA);
  * PIOB : 가변저항 PIO
  * PIOA : 엔코더
  */
+ 
   
-PIOD->PIO_PER = 0x000000F0;
-PIOD->PIO_IDR = 0x000000F0;
-PIOD->PIO_OER = 0x000000F0;
-PIOD->PIO_OWER = 0x000000F0;
-PIOD->PIO_ODSR = 0x00000000;
+  PIOD->PIO_PER = 0x000000F0;
+  PIOD->PIO_IDR = 0x000000F0;
+  PIOD->PIO_OER = 0x000000F0;
+  PIOD->PIO_OWER = 0x000000F0;
+  PIOD->PIO_ODSR = 0x00000000;
 
-  PIOB->PIO_PER = 0x00000011;     //가변저항과 연결된 핀 enable
+  PIOB->PIO_PER = 0x00000011;     //pin 25 (PD0)의 PIO를 enable
   PIOB->PIO_IDR = 0x00000011;     //interrupt disable
   PIOB->PIO_IFER = 0x00000001;    //input filter enable register
   PIOB->PIO_ODR = 0x00000001;     //PD0을 입력으로 설정
 
-  PIOB->PIO_PER = 0x00000010;     // 출력으로 설정
+  PIOB->PIO_PER = 0x00000010;     //pin14 를 출력으로 설정
   PIOB->PIO_OWER = 0x00000010;    //Output Write Enable 설정해서
                                   //PIO_ODSR에 data를 쓸 수 있도록 함  
   PIOB->PIO_ODSR = 0x00000000;
@@ -166,12 +175,17 @@ void loop() {
   {
     PIOD->PIO_SODR = 0x00000010;
   }
-  PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(PID1.PID_control);
-  PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(PID1.PID_control);
-  PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(PID1.PID_control);
-  Serial.print(PID1.PID_control);
+  PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(duty);
+  PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(duty);
+  PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(duty);
+  Serial.print(duty);
   PWM->PWM_SCUC = 1;
   delay(1);
+
+  
+  while(!((end_time - micros()) & 0x80000000));
+  end_time += MicrosSampleTime;
+
 
   start_count = cnt2;                  // 시작 펄스수
   cnt2 = TC2->TC_CHANNEL[0].TC_CV;     // 끝 펄스수
@@ -183,8 +197,6 @@ void loop() {
   Serial.println(result);
   Serial.print("\n");
   re_count = 0;
-  while(!((end_time - micros()) & 0x80000000));
-  end_time += MicrosSampleTime;
 }
 
 
@@ -247,8 +259,8 @@ LPF::~LPF()
 
 PID::PID(int32_t Ts)
 {
-  Kp = 1;
-  Ki = 0.3;
+  Kp = 1.2;
+  Ki = 0.5;
   Kd = 1.9;
   Ts = Ts;
 }
@@ -256,9 +268,9 @@ void PID::calc()
 {
   error = Wd - Wc;
   P_control = Kp * error;
-  I_control = Ki * error * Ts;
+  I_control += Ki * error * Ts;
   D_control = Kd * (error - error_previous) / Ts;
-  PID_control = P_control + D_control;
+  PID_control = P_control + I_control;
   error_previous = error;
 }
 PID::~PID()
