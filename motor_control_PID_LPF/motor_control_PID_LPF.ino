@@ -149,10 +149,10 @@ void loop() {
   PID1.Wc = result;
   PID1.Wd = data[1];
   PID1.calc();
-  //data[1] = PID1.PID_control;
+  data[1] = PID1.PID_control;
 
-  Serial.print(data[1]);
-  Serial.print(" ");
+  //Serial.print(data[1]);
+  //Serial.print(" ");
 
 
   
@@ -169,10 +169,10 @@ void loop() {
   {
     PIOD->PIO_SODR = 0x00000010;
   }
-  PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(PID1.PID_control);
-  PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(PID1.PID_control);
-  PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(PID1.PID_control);
-  Serial.print(PID1.PID_control);
+  PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(PID1.PID_control*2);
+  PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(PID1.PID_control*2);
+  PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(PID1.PID_control*2);
+  Serial.print(PID1.PID_control*2);
   PWM->PWM_SCUC = 1;
   delay(1);
 
