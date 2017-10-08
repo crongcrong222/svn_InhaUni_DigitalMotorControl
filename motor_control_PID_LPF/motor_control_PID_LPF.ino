@@ -264,8 +264,4 @@ void PID::calc()
   PID_control = P_control + I_control + D_control;
   error_previous = error;
 }
-PID::~PID()
-{
-   
-}
- 
+
