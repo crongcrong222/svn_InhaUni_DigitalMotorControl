@@ -43,8 +43,8 @@ class PID
   public:
       int32_t Kp, Ki, Kd;
       int32_t Wc, Wd;
-      float P_control, I_control, D_control, PID_control;
-      int32_t error, Ts;
+      float P_control, I_control, D_control, PID_control, error;
+      int32_t Ts;
 };
 
 
