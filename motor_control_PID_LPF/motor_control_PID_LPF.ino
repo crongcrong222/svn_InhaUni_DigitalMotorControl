@@ -22,6 +22,9 @@ uint32_t MicrosSampleTime;
 uint32_t start_time, end_time;
 int32_t error_previous = 0;
 
+float ref_velocity;
+
+
 class LPF
 {
   public:
@@ -84,9 +87,12 @@ pmc_enable_periph_clk(ID_PIOA);
   PIOB->PIO_ODSR = 0x00000000;
 
 PIOC->PIO_PDR = PIO_PC2 | PIO_PC3 | PIO_PC4 | PIO_PC5 | PIO_PC6 | PIO_PC7;
+// PIOC->PIO_PDR = 0x000000FC 로 바꿀 수 있음
+// 0000 0000 0000 0000 0000 0000 1111 1100 PIO_PDR 레지스터 상태
 PIOC->PIO_ABSR |= PIO_PC2 | PIO_PC3 | PIO_PC4 | PIO_PC5 | PIO_PC6 | PIO_PC7;
 pmc_enable_periph_clk(ID_PWM);
 PWM->PWM_DIS = (1u<<0) | (1u<<1) | (1u<<2);
+// PWM->PWM_DIS = 0x00000007 로도 나타낼 수 있음
 
 PWM->PWM_CLK &= ~0x0F000F00; 
 PWM->PWM_CLK &= ~0x00FF0000;
@@ -122,7 +128,6 @@ configure_encoder_counter();
   sample_time = 0.01;
   MicrosSampleTime = (uint32_t)(sample_time*1e6); //델타 t(sample time)
                                                   // micro second 단위
-
 }
 
 void loop() {
@@ -132,16 +137,13 @@ void loop() {
   // put your main code here, to run repeatedly:
   adc_start(ADC);
 
-  while((ADC->ADC_ISR & ADC_ISR_EOC0) != ADC_ISR_EOC0);
-  data[0] = adc_get_channel_value(ADC, ADC_CHANNEL_0) - 2000;
-
   while((ADC->ADC_ISR & ADC_ISR_EOC1) !=ADC_ISR_EOC1);
-  data[1] = adc_get_channel_value(ADC, ADC_CHANNEL_1) - 2000;
+  data[1] = adc_get_channel_value(ADC, ADC_CHANNEL_1) - 2048;
+
+  ref_velocity = data[1] * (13*PI / 2045);
 
 
-
-
-  LPF1.uk = (float)data[1];
+  LPF1.uk = ref_velocity;
   LPF1.calc();
   //Serial.print(LPF1.yk);        //Class를 통해 가공된 데이터
   //Serial.print(" ");
@@ -151,14 +153,14 @@ void loop() {
   //Serial.print(" ");
   delay(20);
 
-  data[1] = LPF1.yk;
-  PID1.Wc = result;
-  PID1.Wd = data[1];
-  PID1.calc();
-  data[1] = PID1.PID_control;
+  ref_velocity = LPF1.yk;
+  //PID1.Wc = result;
+  //PID1.Wd = data[1];
+  //PID1.calc();
+  //data[1] = PID1.PID_control;
 
-  //Serial.print(data[1]);
-  //Serial.print(" ");
+  Serial.print(ref_velocity);
+  Serial.print(" ");
 
 
   
@@ -176,15 +178,9 @@ void loop() {
     PIOD->PIO_SODR = 0x00000010;
   }
   PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(duty);
-  PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(duty);
-  PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(duty);
-  Serial.print(duty);
+  //Serial.print(duty);
   PWM->PWM_SCUC = 1;
   delay(1);
-
-  
-  while(!((end_time - micros()) & 0x80000000));
-  end_time += MicrosSampleTime;
 
 
   start_count = cnt2;                  // 시작 펄스수
@@ -193,10 +189,13 @@ void loop() {
   re_count = cnt2-start_count;        //변한 펄스 수
   result = (((re_count*2*PI)/64)/MicrosSampleTime)*1e6;
   //  rad/sec
-  Serial.print(" ");
-  Serial.println(result);
+  //Serial.print(" ");
+  //Serial.println(result);
   Serial.print("\n");
   re_count = 0;
+
+  while(!((end_time - micros()) & 0x80000000));
+  end_time += MicrosSampleTime;
 }
 
 
@@ -259,10 +258,11 @@ LPF::~LPF()
 
 PID::PID(int32_t Ts)
 {
-  Kp = 1.2;
+  Kp = 1;
   Ki = 0.5;
   Kd = 1.9;
   Ts = Ts;
+  Wc = Wd;
 }
 void PID::calc()
 {
@@ -270,7 +270,7 @@ void PID::calc()
   P_control = Kp * error;
   I_control += Ki * error * Ts;
   D_control = Kd * (error - error_previous) / Ts;
-  PID_control = P_control + I_control;
+  PID_control = P_control + I_control + D_control;
   error_previous = error;
 }
 PID::~PID()
