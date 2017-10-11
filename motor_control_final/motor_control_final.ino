@@ -3,30 +3,34 @@
 //pin A7 (PA2)  가변저항1
 //pin A6 (PA3)  가변저항2
 
-int cnt = 0;
-int data_in;        // port 값을 읽어들여 저장할 변수
-char str[64];       // message를 담기 위한 string data
-signed int data[2];
-
-void configure_adc();
-
-float sim_time = 0;
-
+//#include "monitor.h"
 
 
 void configure_encoder_counter();
-//char str[64];
-int32_t cnt1, cnt2, start_count,result, re_count,duty;
+void configure_adc();
+
+signed int data[1];
+
+int32_t cnt1, start_count,result, re_count,duty;
+int32_t error_previous = 0;
+
 float sample_time,ref_velocity;
 float m_velocity = 0;
+float sim_time = 0;
+
 uint32_t MicrosSampleTime;
 uint32_t start_time, end_time;
-int32_t error_previous = 0;
+
+
+String str;
+String Serial_input_Kp, Serial_input_Ki;
+float K,Kp,Ki;
+
 
 class LPF
 {
   public:
-  LPF(float Fc, float Ts);
+  LPF(float Fc, float Ts_input);
   ~LPF();
   void calc();
   public:
@@ -38,7 +42,7 @@ class LPF
 class PID
 {
   public:
-      PID(float Ts);
+      PID(float Kp_input, float Ki_input, float Ts_input);
       ~PID();
   void calc();
   public:
@@ -52,7 +56,7 @@ class PID
 
 LPF LPF1(3.0, 0.02);
 LPF LPF2(3.0, 0.02);
-PID PID1(0.02);
+PID PID1(Kp,Ki,0.02);
 
 void setup() {
   Serial.begin(115200);
@@ -101,18 +105,18 @@ PWM->PWM_CH_NUM[0].PWM_CMR |=1u<<8;
 PWM->PWM_CH_NUM[0].PWM_CMR &= -(1u<<9);
 
 PWM->PWM_CH_NUM[0].PWM_CMR |= (1u<<16);
-PWM->PWM_CH_NUM[1].PWM_CMR |= (1u<<16);
-PWM->PWM_CH_NUM[2].PWM_CMR |= (1u<<16);
+//PWM->PWM_CH_NUM[1].PWM_CMR |= (1u<<16);
+//PWM->PWM_CH_NUM[2].PWM_CMR |= (1u<<16);
 
 PWM->PWM_CH_NUM[0].PWM_DT = 0x00030003;
-PWM->PWM_CH_NUM[1].PWM_DT = 0x00050005;
-PWM->PWM_CH_NUM[2].PWM_DT = 0x000F000F;
+//PWM->PWM_CH_NUM[1].PWM_DT = 0x00050005;
+//PWM->PWM_CH_NUM[2].PWM_DT = 0x000F000F;
 
 PWM->PWM_CH_NUM[0].PWM_CPRD = 2100;
 
 PWM->PWM_CH_NUM[0].PWM_CDTY = 0;
-PWM->PWM_CH_NUM[1].PWM_CDTY = 0;
-PWM->PWM_CH_NUM[2].PWM_CDTY = 0;
+//PWM->PWM_CH_NUM[1].PWM_CDTY = 0;
+//PWM->PWM_CH_NUM[2].PWM_CDTY = 0;
 
 PWM->PWM_SCM |=0x00000007;
 PWM->PWM_SCM &=~0x00030000;
@@ -128,6 +132,22 @@ configure_encoder_counter();
 }
 
 void loop() {
+  if(Serial.available())
+  {
+    str = Serial.readString();
+    int a = str.indexOf(",");
+    int len = str.length();
+    Serial_input_Kp = str.substring(0,a);
+    Serial_input_Ki = str.substring(a+1,len);    
+    K = Serial_input_Kp.toFloat();
+    Kp = float(K);
+    K = Serial_input_Ki.toFloat();
+    Ki = float(K);
+    PID1(Kp,Ki,0.02);
+    Serial.print("Kp = %f",Kp);
+    Serial.println("Ki = %f",Ki);
+  }
+  
   start_time = micros();
   end_time = start_time + MicrosSampleTime;
 
@@ -135,18 +155,16 @@ void loop() {
   adc_start(ADC);
 
   while((ADC->ADC_ISR & ADC_ISR_EOC1) !=ADC_ISR_EOC1);
-  data[1] = adc_get_channel_value(ADC, ADC_CHANNEL_1) - 2048;
+  data[0] = adc_get_channel_value(ADC, ADC_CHANNEL_1) - 2048;
 
 
-  ref_velocity = data[1] * (10.5*PI / 2048);
+  ref_velocity = data[0] * (10.5*PI / 2048);
 
   LPF1.uk = ref_velocity;
   LPF1.calc();
   //Serial.print(LPF1.yk);        //Class를 통해 가공된 데이터
   //Serial.print(" ");
   //Serial.print(data[0]);
-  //Serial.print(" ");
-  //Serial.print(data[1]);
   //Serial.print(" ");
   ref_velocity = LPF1.yk;
 
@@ -161,10 +179,9 @@ void loop() {
 
   
   
-  start_count = cnt2;                  // 시작 펄스수
-  cnt2 = TC2->TC_CHANNEL[0].TC_CV;     // 끝 펄스수
-  //sprintf(str,"cnt1 = %u, cnt2 = %u\n", cnt1, cnt2);  
-  re_count = cnt2-start_count;        //변한 펄스 수
+  start_count = cnt1;                  // 시작 펄스수
+  cnt1 = TC2->TC_CHANNEL[0].TC_CV;     // 끝 펄스수
+  re_count = cnt1-start_count;        //변한 펄스 수
   m_velocity = (((re_count*2*PI)/(64*30))/MicrosSampleTime)*1e6;
   LPF2.uk = m_velocity;
   LPF2.calc();
@@ -196,8 +213,8 @@ if(duty<0)
     PIOD->PIO_SODR = 0x00000010;
   }
   PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(duty);
-  PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(duty);
-  PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(duty);
+  //PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(duty);
+  //PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(duty);
   //Serial.print(duty);
   PWM->PWM_SCUC = 1;
   delay(1);
@@ -245,11 +262,11 @@ void configure_encoder_counter()
 
 }
 
-LPF::LPF(float Fc, float Ts)
+LPF::LPF(float Fc, float Ts_input)
 {
   float Wc = 2.0*3.141592*Fc;
-  k1 = Wc*Ts/(Wc*Ts+2.0);
-  k2 = (Wc*Ts-2.0)/(Wc*Ts+2.0);
+  k1 = Wc*Ts_input/(Wc*Ts_input+2.0);
+  k2 = (Wc*Ts_input-2.0)/(Wc*Ts_input+2.0);
   xk = 0.0;
 }
 void LPF::calc()
@@ -264,15 +281,15 @@ LPF::~LPF()
 
 
 
-PID::PID(float Ts)
+PID::PID(float Kp_input , float Ki_input , float Ts_input)
 {
-  Kp = 0.1;
-  Ki = 0.9;
+  Kp = Kp_input;
+  Ki = Ki_input;
   Kd = 0;
+  Ts = Ts_input;
 }
 void PID::calc()
 {
-  float Ts = 0.02;
   error = (Ref - Fdb)*(12/10.5*PI);
   if(Fdb ==0)
   {
