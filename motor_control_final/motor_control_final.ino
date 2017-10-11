@@ -3,7 +3,6 @@
 //pin A7 (PA2)  가변저항1
 //pin A6 (PA3)  가변저항2
 
-//#include "monitor.h"
 
 
 void configure_encoder_counter();
