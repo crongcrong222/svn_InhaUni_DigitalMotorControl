@@ -25,6 +25,7 @@ String str;
 String Serial_input_Kp, Serial_input_Ki;
 float K,Kp,Ki;
 
+uint8_t simul_data[64];
 
 class LPF
 {
@@ -55,7 +56,7 @@ class PID
 
 LPF LPF1(3.0, 0.02);
 LPF LPF2(3.0, 0.02);
-PID PID1(Kp,Ki,0.02);
+PID PID1(0.1,1,0.02);
 
 void setup() {
   Serial.begin(115200);
@@ -138,13 +139,15 @@ void loop() {
     int len = str.length();
     Serial_input_Kp = str.substring(0,a);
     Serial_input_Ki = str.substring(a+1,len);    
-    K = Serial_input_Kp.toFloat();
-    Kp = float(K);
-    K = Serial_input_Ki.toFloat();
-    Ki = float(K);
-    PID1(Kp,Ki,0.02);
-    Serial.print("Kp = %f",Kp);
-    Serial.println("Ki = %f",Ki);
+    Kp = Serial_input_Kp.toFloat();
+    Ki = Serial_input_Ki.toFloat();
+
+    PID1.Kp = Kp;
+    PID1.Ki = Ki;
+    //Serial.print("Kp");
+    //Serial.print(Kp);
+    //Serial.print("Ki");
+    //Serial.println(Ki);
   }
   
   start_time = micros();
@@ -195,7 +198,7 @@ void loop() {
   //Serial.print(" ");
   //Serial.print(PID1.Ts);
   //Serial.print(" ");
-  Serial.print(PID1.I_control);
+  //Serial.print(PID1.I_control);
   Serial.print("\n");
   re_count = 0;
 
@@ -217,6 +220,24 @@ if(duty<0)
   //Serial.print(duty);
   PWM->PWM_SCUC = 1;
   delay(1);
+
+  #if 0
+    simul_data[0] = ref_velocity;
+    simul_data[1] = m_velocity;
+    simul_data[2] = '\r';
+    simul_data[3] = '\n';
+    Serial.write(simul_data,4);
+  #endif
+    
+  #if 1
+    *(uint32_t *)(&simul_data[0]) = *(uint32_t *)(&ref_velocity);
+    *(uint32_t *)(&simul_data[4]) = *(uint32_t *)(&m_velocity);
+    simul_data[8] = '\r';
+    simul_data[9] = '\n';
+    Serial.write(simul_data , 10);
+  #endif  
+  
+
   
   while(!((end_time - micros()) & 0x80000000));
   end_time += MicrosSampleTime;  
@@ -315,5 +336,3 @@ PID::~PID()
 {
    
 }
-
-
