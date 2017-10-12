@@ -56,7 +56,7 @@ class PID
 
 LPF LPF1(3.0, 0.02);
 LPF LPF2(3.0, 0.02);
-PID PID1(0.1,1,0.02);
+PID PID1(0.15,0.9,0.02);
 
 void setup() {
   Serial.begin(115200);
@@ -128,7 +128,8 @@ configure_encoder_counter();
   sample_time = 0.02;
   MicrosSampleTime = (uint32_t)(sample_time*1e6); //델타 t(sample time)
                                                   // micro second 단위
-
+  start_time = micros();
+  end_time = start_time + MicrosSampleTime;
 }
 
 void loop() {
@@ -150,8 +151,6 @@ void loop() {
     //Serial.println(Ki);
   }
   
-  start_time = micros();
-  end_time = start_time + MicrosSampleTime;
 
   // put your main code here, to run repeatedly:
   adc_start(ADC);
@@ -170,24 +169,18 @@ void loop() {
   //Serial.print(" ");
   ref_velocity = LPF1.yk;
 
+  
 
 
+  start_count = TC2->TC_CHANNEL[0].TC_CV;     // 시작
 
+  while(!((end_time - micros()) & 0x80000000));
+  end_time += MicrosSampleTime;  
+  cnt1 = TC2->TC_CHANNEL[0].TC_CV;     // 끝
 
   
-  //sim_time += 0.001;
-
-  //duty = (int32_t)(1050*sin(sim_time));
-
-  
-  
-  start_count = cnt1;                  // 시작 펄스수
-  cnt1 = TC2->TC_CHANNEL[0].TC_CV;     // 끝 펄스수
   re_count = cnt1-start_count;        //변한 펄스 수
   m_velocity = (((re_count*2*PI)/(64*30))/MicrosSampleTime)*1e6;
-  LPF2.uk = m_velocity;
-  LPF2.calc();
-  m_velocity = LPF2.yk;
   //  rad/sec
   //Serial.print(" ");
   Serial.print(ref_velocity);
@@ -201,25 +194,6 @@ void loop() {
   //Serial.print(PID1.I_control);
   Serial.print("\n");
   re_count = 0;
-
-  PID1.Ref = ref_velocity;
-  PID1.Fdb = m_velocity;
-  PID1.calc();
-  duty = (PID1.PID_control/12)*2100;
-if(duty<0)
-  {
-    PIOD->PIO_CODR = 0x00000010;
-  }
-  else
-  {
-    PIOD->PIO_SODR = 0x00000010;
-  }
-  PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(duty);
-  //PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(duty);
-  //PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(duty);
-  //Serial.print(duty);
-  PWM->PWM_SCUC = 1;
-  delay(1);
 
   #if 0
     simul_data[0] = ref_velocity;
@@ -239,8 +213,31 @@ if(duty<0)
   
 
   
-  while(!((end_time - micros()) & 0x80000000));
-  end_time += MicrosSampleTime;  
+
+
+  LPF2.uk = m_velocity;
+  LPF2.calc();
+  m_velocity = LPF2.yk;
+  PID1.Ref = ref_velocity;
+  PID1.Fdb = m_velocity;
+  PID1.calc();
+  duty = (PID1.PID_control/12)*2100;
+  PWM->PWM_CH_NUM[0].PWM_CDTYUPD = abs(duty);
+  //PWM->PWM_CH_NUM[1].PWM_CDTYUPD = abs(duty);
+  //PWM->PWM_CH_NUM[2].PWM_CDTYUPD = abs(duty);
+  //Serial.print(duty);
+  PWM->PWM_SCUC = 1;
+  
+  if(duty<0)
+  {
+    PIOD->PIO_CODR = 0x00000010;
+  }
+  else
+  {
+    PIOD->PIO_SODR = 0x00000010;
+  }
+  delay(1);
+  
 }
 
 
@@ -259,12 +256,9 @@ void configure_adc()
    *  the fast adc startup time
    *  #define ADC_STARTUP_FAST   12
    */
-
    adc_init(ADC, SystemCoreClock, ADC_FREQ_MAX, ADC_STARTUP_FAST);
    adc_configure_timing(ADC, 1, ADC_SETTLING_TIME_3, 1);
-
    adc_set_resolution(ADC, ADC_12_BITS);
-
    adc_enable_channel(ADC, ADC_CHANNEL_0);
    adc_enable_channel(ADC, ADC_CHANNEL_1);
 }
