@@ -55,8 +55,8 @@ class PID
 
 
 LPF LPF1(3.0, 0.02);
-LPF LPF2(3.0, 0.02);
-PID PID1(0.15,0.9,0.02);
+//LPF LPF2(3.0, 0.02);
+PID PID1(0.7,2,0.02);
 
 void setup() {
   Serial.begin(115200);
@@ -183,17 +183,23 @@ void loop() {
   m_velocity = (((re_count*2*PI)/(64*30))/MicrosSampleTime)*1e6;
   //  rad/sec
   //Serial.print(" ");
-  Serial.print(ref_velocity);
-  Serial.print(" ");
-  Serial.print(m_velocity);
-  Serial.print(" ");
+  //Serial.print(ref_velocity);
+  //Serial.print(" ");
+  //Serial.print(m_velocity);
+  //Serial.print(" ");
   //Serial.print(PID1.error);
   //Serial.print(" ");
   //Serial.print(PID1.Ts);
   //Serial.print(" ");
   //Serial.print(PID1.I_control);
-  Serial.print("\n");
+  //Serial.print("\n");
   re_count = 0;
+  
+  #if 0
+    Serial.write(ref_velocity);
+    Serial.write(m_velocity);
+    Serial.write("\r\n");
+  #endif
 
   #if 0
     simul_data[0] = ref_velocity;
@@ -214,10 +220,6 @@ void loop() {
 
   
 
-
-  LPF2.uk = m_velocity;
-  LPF2.calc();
-  m_velocity = LPF2.yk;
   PID1.Ref = ref_velocity;
   PID1.Fdb = m_velocity;
   PID1.calc();
